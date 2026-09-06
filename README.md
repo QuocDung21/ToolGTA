@@ -1,4 +1,4 @@
-﻿# 🎣 ToolGTA — Auto Fishing Multi-Version Suite (GTA V / FiveM)
+# 🎣 ToolGTA — Auto Fishing Multi-Version Suite (GTA V / FiveM)
 
 Bộ công cụ tự động nhận diện và giải minigame QTE câu cá (5 mũi tên) cho máy chủ GTA V / FiveM (Lũ Quỷ RP). Bao gồm 3 phiên bản được tối ưu hóa cho các nhu cầu sử dụng khác nhau.
 
@@ -17,6 +17,11 @@ Bộ công cụ tự động nhận diện và giải minigame QTE câu cá (5 m
     * **F1**: Bật / Dừng Tool ngay trong game.
     * **F2**: Tạm dừng / Tiếp tục.
     * **F3**: Dừng khẩn cấp toàn bộ hoạt động.
+    * **F4**: Bật / Tắt Modal HUD nổi trong game.
+  * **In-Game Overlay HUD (Modal Nổi)**:
+    * Hiển thị đè trực tiếp lên game (Always-On-Top, Borderless, Dark Glass bán trong suốt).
+    * Kéo thả di chuyển tự do đến vị trí tùy ý trên màn hình.
+    * Hiển thị trực tiếp trạng thái, số cá đã câu, số minigame đã giải, chuỗi mũi tên QTE và nhật ký thao tác gần nhất.
 * **Cách chạy**:
   * Nhấp đúp vào `run.bat` để chạy phiên bản Release tối ưu.
   * Nhấp đúp vào `build.bat` để biên dịch lại từ mã nguồn.

@@ -68,6 +68,14 @@ pub struct AntiAfkSettings {
     pub max_actions_before_anti_afk: u32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OverlaySettings {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_overlay_opacity")]
+    pub opacity: f32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
     #[serde(default)]
@@ -78,8 +86,11 @@ pub struct AppConfig {
     pub detection: DetectionSettings,
     #[serde(default)]
     pub anti_afk: AntiAfkSettings,
+    #[serde(default)]
+    pub overlay: OverlaySettings,
 }
 
+fn default_overlay_opacity() -> f32 { 0.88 }
 fn default_false() -> bool { false }
 fn default_true() -> bool { true }
 fn default_f1() -> String { "f1".to_string() }
@@ -154,6 +165,15 @@ impl Default for AntiAfkSettings {
             random_look_around: true,
             min_actions_before_anti_afk: default_min_afk(),
             max_actions_before_anti_afk: default_max_afk(),
+        }
+    }
+}
+
+impl Default for OverlaySettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            opacity: default_overlay_opacity(),
         }
     }
 }

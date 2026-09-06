@@ -1,5 +1,6 @@
 use crate::bot::{BotController, BotStatus};
 use crate::config::AppConfig;
+use crate::ui::overlay::render_overlay;
 use eframe::egui::{self, Color32, RichText, ScrollArea, Stroke};
 
 #[derive(PartialEq)]
@@ -11,17 +12,20 @@ enum ActiveTab {
 pub struct AutoFishApp {
     bot: BotController,
     active_tab: ActiveTab,
+    overlay_open: bool,
 }
 
 impl AutoFishApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         Self::configure_fonts(&cc.egui_ctx);
         let config = AppConfig::load_or_default("config/settings.json");
+        let overlay_open = config.overlay.enabled;
         let bot = BotController::new(config);
 
         Self {
             bot,
             active_tab: ActiveTab::Dashboard,
+            overlay_open,
         }
     }
 
@@ -76,7 +80,11 @@ impl eframe::App for AutoFishApp {
         ctx.request_repaint_after(std::time::Duration::from_millis(50));
 
         let (status, fish, solved, seq, logs, is_run, is_paused, is_test) = {
-            if let Ok(s) = self.bot.state.lock() {
+            if let Ok(mut s) = self.bot.state.lock() {
+                if s.overlay_toggle_requested {
+                    s.overlay_toggle_requested = false;
+                    self.overlay_open = !self.overlay_open;
+                }
                 (
                     s.status,
                     s.fish_count,
@@ -91,6 +99,26 @@ impl eframe::App for AutoFishApp {
                 (BotStatus::Idle, 0, 0, Vec::new(), Vec::new(), false, false, false)
             }
         };
+
+        // Render In-Game Overlay HUD window
+        if self.overlay_open {
+            let opacity = if let Ok(cfg) = self.bot.config.lock() {
+                cfg.overlay.opacity
+            } else {
+                0.88
+            };
+            let last_log = logs.last().map(|(_, msg)| msg.as_str());
+            render_overlay(
+                ctx,
+                status,
+                fish,
+                solved,
+                &seq,
+                last_log,
+                opacity,
+                &mut self.overlay_open,
+            );
+        }
 
         egui::CentralPanel::default().show(ctx, |ui| {
             // HEADER BAR
@@ -182,7 +210,19 @@ impl eframe::App for AutoFishApp {
                                 let _ = cfg.save("config/settings.json");
                             }
                         }
-                        ui.label(RichText::new("💡 Phím nóng trong game: F1 (Bật/Tắt) • F2 (Tạm dừng) • F3 (Dừng khẩn)").color(Color32::from_rgb(186, 194, 222)).size(11.0));
+
+                        let overlay_label = if self.overlay_open { "🖥️ Ẩn HUD Nổi Trong Game" } else { "🖥️ Hiện HUD Nổi Trong Game" };
+                        let overlay_btn_color = if self.overlay_open { Color32::from_rgb(137, 220, 235) } else { Color32::from_rgb(49, 50, 68) };
+                        let overlay_txt_color = if self.overlay_open { Color32::from_rgb(17, 17, 27) } else { Color32::from_rgb(205, 214, 244) };
+                        if ui.add(egui::Button::new(RichText::new(overlay_label).color(overlay_txt_color).strong()).fill(overlay_btn_color)).clicked() {
+                            self.overlay_open = !self.overlay_open;
+                            if let Ok(mut cfg) = self.bot.config.lock() {
+                                cfg.overlay.enabled = self.overlay_open;
+                                let _ = cfg.save("config/settings.json");
+                            }
+                        }
+
+                        ui.label(RichText::new("💡 Phím nóng: F1 (Start/Stop) • F2 (Pause) • F3 (Panic) • F4 (Bật/Tắt HUD)").color(Color32::from_rgb(186, 194, 222)).size(11.0));
                     });
 
                     ui.add_space(6.0);
@@ -291,6 +331,18 @@ impl eframe::App for AutoFishApp {
                             ui.add_space(6.0);
                             ui.label(RichText::new("Thời gian nghỉ trước khi quăng lại cần (giây):").strong());
                             ui.add(egui::Slider::new(&mut cfg.delays.recast_wait_sec, 0.5..=6.0));
+                        });
+
+                        ui.add_space(8.0);
+                        ui.group(|ui| {
+                            ui.label(RichText::new("🖥️ Cấu Hình In-Game Overlay (HUD Nổi)").strong());
+                            if ui.checkbox(&mut cfg.overlay.enabled, "Bật HUD nổi khi khởi động").changed() {
+                                self.overlay_open = cfg.overlay.enabled;
+                            }
+                            ui.horizontal(|ui| {
+                                ui.label("Độ mờ nền HUD (Opacity):");
+                                ui.add(egui::Slider::new(&mut cfg.overlay.opacity, 0.2..=1.0));
+                            });
                         });
 
                         ui.add_space(10.0);

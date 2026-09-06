@@ -58,6 +58,7 @@ pub struct BotState {
     pub is_running: bool,
     pub is_paused: bool,
     pub is_test_mode: bool,
+    pub overlay_toggle_requested: bool,
 }
 
 impl Default for BotState {
@@ -74,6 +75,7 @@ impl Default for BotState {
             is_running: false,
             is_paused: false,
             is_test_mode: false,
+            overlay_toggle_requested: false,
         }
     }
 }
@@ -115,16 +117,18 @@ impl BotController {
 
     #[cfg(target_os = "windows")]
     fn hotkey_loop(state: Arc<Mutex<BotState>>, exit: Arc<AtomicBool>) {
-        use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_F1, VK_F2, VK_F3};
+        use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_F1, VK_F2, VK_F3, VK_F4};
         let mut f1_was_down = false;
         let mut f2_was_down = false;
         let mut f3_was_down = false;
+        let mut f4_was_down = false;
 
         while !exit.load(Ordering::Relaxed) {
             unsafe {
                 let f1_is_down = (GetAsyncKeyState(VK_F1.0 as i32) as u16 & 0x8000) != 0;
                 let f2_is_down = (GetAsyncKeyState(VK_F2.0 as i32) as u16 & 0x8000) != 0;
                 let f3_is_down = (GetAsyncKeyState(VK_F3.0 as i32) as u16 & 0x8000) != 0;
+                let f4_is_down = (GetAsyncKeyState(VK_F4.0 as i32) as u16 & 0x8000) != 0;
 
                 if f1_is_down && !f1_was_down {
                     Self::toggle_running_internal(&state);
@@ -135,10 +139,16 @@ impl BotController {
                 if f3_is_down && !f3_was_down {
                     Self::panic_exit_internal(&state);
                 }
+                if f4_is_down && !f4_was_down {
+                    if let Ok(mut s) = state.lock() {
+                        s.overlay_toggle_requested = true;
+                    }
+                }
 
                 f1_was_down = f1_is_down;
                 f2_was_down = f2_is_down;
                 f3_was_down = f3_is_down;
+                f4_was_down = f4_is_down;
             }
             thread::sleep(Duration::from_millis(25));
         }
