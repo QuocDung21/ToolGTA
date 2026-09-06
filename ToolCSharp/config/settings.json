@@ -1,0 +1,34 @@
+{
+  "general": {
+    "auto_start": false,
+    "auto_recast": false,
+    "hotkey_start": "F1",
+    "hotkey_pause": "F2",
+    "hotkey_panic": "F3",
+    "rod_slot_key": "1"
+  },
+  "delays": {
+    "min_key_press_ms": 65,
+    "max_key_press_ms": 115,
+    "min_interval_ms": 90,
+    "max_interval_ms": 160,
+    "reel_in_wait_sec": 4.5,
+    "recast_wait_sec": 2.0
+  },
+  "detection": {
+    "arrow_match_threshold": 0.72,
+    "red_hsv_lower1": [ 0, 100, 100 ],
+    "red_hsv_upper1": [ 10, 255, 255 ],
+    "red_hsv_lower2": [ 170, 100, 100 ],
+    "red_hsv_upper2": [ 180, 255, 255 ]
+  },
+  "anti_afk": {
+    "enabled": true,
+    "min_actions": 5,
+    "max_actions": 12
+  },
+  "alerts": {
+    "discord_webhook_url": "",
+    "sound_alarm_on_fail": true
+  }
+}
