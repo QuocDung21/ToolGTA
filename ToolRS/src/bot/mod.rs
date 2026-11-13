@@ -236,6 +236,18 @@ impl BotController {
 
     fn worker_loop(state: Arc<Mutex<BotState>>, config: Arc<Mutex<AppConfig>>, exit: Arc<AtomicBool>) {
         let mut capture = ScreenCapture::new();
+        let monitors = ScreenCapture::list_monitors();
+        if monitors.is_empty() {
+            Self::add_log(&state, "⚠️ CẢNH BÁO: Không tìm thấy màn hình nào để chụp!");
+        } else {
+            Self::add_log(
+                &state,
+                &format!(
+                    "🖥️ Phát hiện {} màn hình — hỗ trợ quét tự động đa màn hình.",
+                    monitors.len()
+                ),
+            );
+        }
         let mut detector = ArrowDetector::new("assets/templates", 0.65);
         if detector.templates.is_empty() {
             detector = ArrowDetector::new("../assets/templates", 0.65);
@@ -264,14 +276,25 @@ impl BotController {
 
             if is_test {
                 // TEST VIDEO MODE: Chụp & nhận diện màn hình không gửi phím
+                let (threshold, target_monitor_id) = config
+                    .lock()
+                    .map(|c| (c.detection.arrow_match_threshold, c.detection.monitor_id))
+                    .unwrap_or((0.72, None));
+                detector.threshold = threshold;
+
                 let t0 = Instant::now();
-                if let Some(frame) = capture.capture_full() {
-                    let cap_ms = t0.elapsed().as_secs_f32() * 1000.0;
+                let frames = capture.capture_targets(target_monitor_id);
+                let cap_ms = t0.elapsed().as_secs_f32() * 1000.0;
+                let mut detected = false;
+
+                for (mon_id, frame) in frames {
                     let t1 = Instant::now();
                     let seq = detector.detect_sequence(&frame);
                     let det_ms = t1.elapsed().as_secs_f32() * 1000.0;
 
                     if seq.len() == 5 {
+                        capture.set_active_monitor(mon_id);
+                        detected = true;
                         if last_test_detect.elapsed() > Duration::from_millis(1500) {
                             last_test_detect = Instant::now();
                             let seq_str = seq.iter().map(|d| format!("[{} {}]", d.display_icon(), d.as_str())).collect::<Vec<_>>().join(" ");
@@ -285,27 +308,31 @@ impl BotController {
                                 s.logs.push((time_str, log_msg));
                             }
                         }
-                    } else if last_test_detect.elapsed() > Duration::from_millis(2000) {
-                        if let Ok(mut s) = state.lock() {
-                            s.status = BotStatus::TestingScanning;
-                        }
+                        break;
+                    }
+                }
+
+                if !detected && last_test_detect.elapsed() > Duration::from_millis(2000) {
+                    if let Ok(mut s) = state.lock() {
+                        s.status = BotStatus::TestingScanning;
                     }
                 }
                 thread::sleep(Duration::from_millis(15));
             } else if is_run && !is_paused {
                 // Lấy thông số cấu hình thời gian thực
-                let (auto_recast, rod_key, reel_wait, recast_wait, threshold, min_press, max_press, min_int, max_int) = {
+                let (auto_recast, rod_key, reel_wait, recast_wait, threshold, target_monitor_id, min_press, max_press, min_int, max_int) = {
                     config.lock().map(|c| (
                         c.general.auto_recast,
                         c.general.rod_slot_key.clone(),
                         c.delays.reel_in_wait_sec,
                         c.delays.recast_wait_sec,
                         c.detection.arrow_match_threshold,
+                        c.detection.monitor_id,
                         c.delays.min_key_press_ms,
                         c.delays.max_key_press_ms,
                         c.delays.min_interval_ms,
                         c.delays.max_interval_ms,
-                    )).unwrap_or((false, "1".to_string(), 4.5, 2.0, 0.65, 65, 115, 90, 160))
+                    )).unwrap_or((false, "1".to_string(), 4.5, 2.0, 0.65, None, 65, 115, 90, 160))
                 };
 
                 detector.threshold = threshold;
@@ -341,9 +368,13 @@ impl BotController {
                     Self::add_log(&state, "🎧 [LẮNG NGHE] Đang canh màn hình... Chờ minigame xuất hiện.");
                 }
 
-                if let Some(frame) = capture.capture_full() {
+                let frames = capture.capture_targets(target_monitor_id);
+                let mut found_qte = false;
+                for (mon_id, frame) in frames {
                     let seq = detector.detect_sequence(&frame);
                     if seq.len() == 5 {
+                        capture.set_active_monitor(mon_id);
+                        found_qte = true;
                         let seq_strs: Vec<&str> = seq.iter().map(|d| d.as_str()).collect();
                         let pretty = seq.iter().map(|d| format!("[{} {}]", d.display_icon(), d.as_str())).collect::<Vec<_>>().join(" ");
                         Self::add_log(&state, &format!("🎯 Phát hiện minigame câu cá! Mũi tên: {}", pretty));
@@ -395,12 +426,14 @@ impl BotController {
                             last_bite_time = Instant::now();
                         }
                         last_heartbeat = Instant::now();
-                    } else if auto_recast && last_bite_time.elapsed() > Duration::from_secs(50) {
-                        Self::add_log(&state, "⏳ Quá 50s chưa có cá, tự động quăng lại cần câu...");
-                        simulator.press_key(&rod_key, None);
-                        thread::sleep(Duration::from_millis(2500));
-                        last_bite_time = Instant::now();
+                        break;
                     }
+                }
+                if !found_qte && auto_recast && last_bite_time.elapsed() > Duration::from_secs(50) {
+                    Self::add_log(&state, "⏳ Quá 50s chưa có cá, tự động quăng lại cần câu...");
+                    simulator.press_key(&rod_key, None);
+                    thread::sleep(Duration::from_millis(2500));
+                    last_bite_time = Instant::now();
                 }
                 thread::sleep(Duration::from_millis(15));
             } else {

@@ -1,4 +1,5 @@
 use crate::bot::{BotController, BotStatus};
+use crate::capture::{MonitorInfo, ScreenCapture};
 use crate::config::AppConfig;
 use crate::ui::overlay::render_overlay;
 use eframe::egui::{self, Color32, RichText, ScrollArea, Stroke};
@@ -13,6 +14,7 @@ pub struct AutoFishApp {
     bot: BotController,
     active_tab: ActiveTab,
     overlay_open: bool,
+    monitors: Vec<MonitorInfo>,
 }
 
 impl AutoFishApp {
@@ -21,11 +23,13 @@ impl AutoFishApp {
         let config = AppConfig::load_or_default("config/settings.json");
         let overlay_open = config.overlay.enabled;
         let bot = BotController::new(config);
+        let monitors = ScreenCapture::list_monitors();
 
         Self {
             bot,
             active_tab: ActiveTab::Dashboard,
             overlay_open,
+            monitors,
         }
     }
 
@@ -310,6 +314,41 @@ impl eframe::App for AutoFishApp {
                             ui.add_space(6.0);
                             ui.label(RichText::new("Phím Quăng Cần (Slot):").strong());
                             ui.text_edit_singleline(&mut cfg.general.rod_slot_key);
+
+                            ui.add_space(6.0);
+                            ui.label(RichText::new("Màn hình quét (Hỗ trợ đa màn hình):").strong());
+                            ui.horizontal(|ui| {
+                                let selected_label = match cfg.detection.monitor_id {
+                                    None => "Tự động (Quét tất cả màn hình)".to_string(),
+                                    Some(id) => self
+                                        .monitors
+                                        .iter()
+                                        .enumerate()
+                                        .find(|(_, m)| m.id == id)
+                                        .map(|(i, m)| m.display_label(i))
+                                        .unwrap_or_else(|| format!("Màn hình ID {} (Không kết nối)", id)),
+                                };
+                                egui::ComboBox::from_id_salt("monitor_select")
+                                    .selected_text(selected_label)
+                                    .width(340.0)
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(
+                                            &mut cfg.detection.monitor_id,
+                                            None,
+                                            "Tự động (Quét tất cả màn hình)",
+                                        );
+                                        for (i, m) in self.monitors.iter().enumerate() {
+                                            ui.selectable_value(
+                                                &mut cfg.detection.monitor_id,
+                                                Some(m.id),
+                                                m.display_label(i),
+                                            );
+                                        }
+                                    });
+                                if ui.button("🔄 Làm mới").clicked() {
+                                    self.monitors = ScreenCapture::list_monitors();
+                                }
+                            });
 
                             ui.add_space(6.0);
                             ui.label(RichText::new("Độ nhạy nhận diện (Threshold 0.50 - 0.90):").strong());

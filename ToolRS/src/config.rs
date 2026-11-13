@@ -53,6 +53,8 @@ pub struct DetectionSettings {
     #[serde(default = "default_threshold")]
     pub arrow_match_threshold: f32,
     #[serde(default)]
+    pub monitor_id: Option<u32>,
+    #[serde(default)]
     pub screen_roi: ScreenRoiSettings,
 }
 
@@ -153,6 +155,7 @@ impl Default for DetectionSettings {
     fn default() -> Self {
         Self {
             arrow_match_threshold: default_threshold(),
+            monitor_id: None,
             screen_roi: ScreenRoiSettings::default(),
         }
     }
